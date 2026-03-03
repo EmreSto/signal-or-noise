@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd 
 def load_and_resample(filepath, timeframe):
     df = pd.read_csv(filepath)

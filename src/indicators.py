@@ -1,13 +1,24 @@
 import numpy as np
 import pandas as pd 
 
+def wma_np(arr, length):
+    weights = np.arange(1, length + 1, dtype=float)
+    result = np.convolve(arr, weights[::-1], mode='valid') / weights.sum()
+    return np.concatenate([np.full(length - 1, np.nan), result])
+
 def hma(series, length):
-    half_wma = series.rolling(length // 2).apply(lambda x: np.average(x, weights=range(1, len(x)+1)))
-    full_wma = series.rolling(length).apply(lambda x: np.average(x, weights=range(1, len(x)+1)))
-    sqrt_len = round(np.sqrt(length))
+    arr = series.values if hasattr(series, 'values') else np.array(series)
+    half_wma = wma_np(arr, length // 2)
+    full_wma = wma_np(arr, length)
     diff = 2 * half_wma - full_wma
-    return diff.rolling(sqrt_len).apply(lambda x: np.average(x, weights=range(1, len(x)+1))) 
-  
+    sqrt_len = round(np.sqrt(length))
+    valid = diff[~np.isnan(diff)]
+    smoothed = wma_np(valid, sqrt_len)
+
+    result = np.full(len(arr), np.nan)
+    result[len(arr) - len(smoothed):] = smoothed
+    return pd.Series(result, index=series.index) if hasattr(series, 'index') else result
+
 def ssl_channels(df,length):
     high = df['high']
     low = df['low']

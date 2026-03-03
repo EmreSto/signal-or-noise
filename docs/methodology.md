@@ -107,18 +107,20 @@ $EMA_H$ is EMA of highs, $EMA_C$ is EMA of close. The cloud width adapts natural
 
 ## Hypotheses
 
-### H1: SSL Channel Rejection Rates
+### H1: SSL Channel Returns
 
-- **Claim:** SSL channels capture real support and resistance
-- **Null:** Rejection rates on real data are no different from synthetic GARCH data
-- **Method:** Empirical p-value from 1000 synthetic series. Tested on each channel (60 and 120) separately.
+- **Claim:** SSL channels capture real support and resistance - tests produce meaningful directional returns
+- **Null:** Post-touch returns on real data are no different from synthetic GARCH data
+- **Method:** Empirical p-value from 1000 synthetic series (BTC) / 200 (EUR). Forward returns at 5, 10, 20 bars. Tested on each channel (60 and 120) separately.
+
+**Touch definition:** A "fresh channel test" - price enters the channel zone from outside. Bullish: low penetrates HMA_H while hlv = +1 and previous bar's low was above HMA_H. Bearish: high penetrates HMA_L while hlv = -1 and previous bar's high was below HMA_L. This filters out bars where price simply lingers inside the channel.
 
 ### H2: EMA 200 Attraction Post-Crossover
 
 - **Claim:** Price moves toward EMA 200 after a crossover (both SSLs agree)
 - **Null A:** EMA reach rate from crossovers = from random timestamps
 - **Null B:** EMA reach rate from crossovers = from similar sized moves without a crossover
-- **Method:** Two-proportion z-test, Mann-Whitney U
+- **Method:** Two-proportion z-test (reach rate) and Mann-Whitney U (time to reach)
 
 ### H3: AlphaTrend Confirmation Filter
 
@@ -132,13 +134,12 @@ Confirmed = both SSLs agree + AlphaTrend steps in the same direction. Unconfirme
 
 | Asset    | Instrument             | Source    | Period              |
 |----------|------------------------|-----------|---------------------|
-| BTC/USDT | CME Globex             | Databento | Jan 2023 to Feb 2025 |
-| ETH/USDT | CME Globex             | Databento | Jan 2023 to Feb 2025 |
-| EUR/USD  | CME 6E Futures         | Databento | Jan 2023 to Feb 2025 |
+| BTC/USD  | CME Globex BTC Futures | Databento | Jan 2023 – Jan 2026 |
+| EUR/USD  | CME 6E Futures         | Databento | Jan 2023 – Jan 2025 |
 
 All futures. All real exchange volume. Single data provider.
 
-Timeframes: 15m, 30m, 1h, 2h, 4h. Total tests: ~60.
+Timeframes: 15m, 30m, 1h, 2h, 4h. Total tests: 114 (54 H1 + 30 H2 + 30 H3).
 
 ## Test Procedures
 
@@ -146,19 +147,20 @@ Timeframes: 15m, 30m, 1h, 2h, 4h. Total tests: ~60.
 
 1. Fit GARCH(1,1) to real returns for each asset and timeframe.
 2. Generate 1000 synthetic price series from the fitted model. Same statistics, no market structure.
-3. Compute SSL rejection rate on each synthetic series and on real data.
-4. p-value = proportion of synthetic series with rejection rate >= real.
-5. Rejection = price touches channel boundary then closes back inside within a few bars. Breakout = price closes beyond the boundary. Rejection rate = rejections / (rejections + breakouts).
+3. Construct synthetic OHLC: close from GARCH, high/low from randomly sampled real intrabar spreads.
+4. Compute fresh channel test returns on each synthetic series and on real data. Forward returns measured at 5, 10, 20 bars. Bullish: (close[t+N] - close[t]) / close[t]. Bearish: flipped so positive = regime correct.
+5. p-value = proportion of synthetic mean returns >= real mean return.
 
 Runs separately for SSL(60) and SSL(120).
 
 ### H2: Two-Control Comparison
 
 1. Find all crossovers (both SSLs agree on new direction).
-2. Track whether price reaches EMA 200 within 50 bars. Record bars to reach.
+2. Track whether price reaches EMA 200 cloud within N bars (10, 20, 30). Record bars to reach.
 3. Control A: same metric from random timestamps (10x sample size).
 4. Control B: same metric from points with similar sized price moves but no crossover.
-5. Two-proportion z-test and Mann-Whitney U against each control.
+5. Two-proportion z-test against each control (reach rate comparison).
+6. Mann-Whitney U test against Control A (time-to-reach comparison, one-sided: crossovers expected to reach faster).
 
 Reading results:
 - Beats random but not directional moves: crossover just flags big moves.
@@ -170,7 +172,7 @@ Reading results:
 1. Find all crossovers (both SSLs agree). Label as confirmed or unconfirmed by AlphaTrend.
 2. Measure directional return at 5, 10, 20 bars forward. Positive = crossover was right.
 3. Compute delta = mean(confirmed) - mean(unconfirmed).
-4. Shuffle labels 10,000 times. Compute delta each time.
+4. Shuffle labels 1,000 times. Compute delta each time.
 5. p-value = proportion of shuffles where |delta| >= observed.
 
 ## Overfitting Defense
@@ -192,6 +194,24 @@ Benjamini-Hochberg at FDR = 0.05.
 4. All ranks $\leq i$ are discoveries.
 
 Both raw and corrected p-values reported. Only BH-corrected results claimed.
+
+## Results
+
+### H1: 0/54 significant
+SSL channel touches produce returns indistinguishable from GARCH synthetic data across all timeframes and both assets. P-values cluster around 0.5 — dead center of the null distribution.
+
+### H2: 30/30 significant (all p < 0.0001)
+Dual regime crossovers reach EMA 200 at 65-79% vs 25-49% from both random bars (Control A) and momentum-matched bars (Control B). Average time to reach: 1.5-4.5 bars. Both z-test and Mann-Whitney U significant across all tests. Effect is consistent across all timeframes and both BTC and EUR/USD.
+
+### H3: 0/30 significant
+AlphaTrend confirmation does not separate good crossovers from bad. Confirmed and unconfirmed crossovers produce similar returns. On some timeframes, unconfirmed crossovers performed slightly better.
+
+### After Benjamini-Hochberg correction (FDR = 0.05)
+30 discoveries out of 114 tests. All 30 are H2. No H1 or H3 test survives correction.
+
+### Practical implication
+The SSL channel lines themselves are noise - any smoothed average produces the same "resistance/support." But dual HMA regime alignment captures real directional structure that predicts movement toward EMA 200. AlphaTrend adds complexity for zero benefit. The useful system reduces to: dual HMA regime crossover + EMA 200 target.
+
 
 ## References
 
