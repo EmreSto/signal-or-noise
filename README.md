@@ -1,4 +1,4 @@
-# indicators-signal-or-illusion
+# signal-or-noise
 
 **Do trading indicators show real market patterns, or do they just make noise look like patterns?**
 
